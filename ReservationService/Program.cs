@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ReservationService.Configuration;
 using ReservationService.Data;
+using ReservationService.Infrastructure.ErrorHandling;
 using ReservationService.Infrastructure.Extensions;
 using ReservationService.Services.Implementations;
 using ReservationService.Services.Interfaces;
@@ -45,14 +46,25 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddOpenApi();
 builder.Services.AddReservationServiceDependencies();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 
 var app = builder.Build();
-
+if (!app.Environment.IsEnvironment("Test"))
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Database.Migrate();
+    }
+}
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
