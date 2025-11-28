@@ -31,9 +31,52 @@ namespace ReservationService.Domain.Entities
 			int guestsCount,
 			decimal totalPrice)
 		{
-			if (accommodationId == Guid.Empty) throw new ArgumentException("AccommodationId cannot be empty.", nameof(accommodationId));
-			if (guestId == Guid.Empty) throw new ArgumentException("GuestId cannot be empty.", nameof(guestId));
-			if (hostId == Guid.Empty) throw new ArgumentException("HostId cannot be empty.", nameof(hostId));
+			ValidateReservation(
+				accommodationId,
+				guestId,
+				hostId,
+				accommodationName,
+				guestEmail,
+				guestUsername,
+				startDate,
+				endDate,
+				guestsCount,
+				totalPrice);
+
+			AccommodationId = accommodationId;
+			GuestId = guestId;
+			HostId = hostId;
+			AccommodationName = accommodationName.Trim();
+			GuestEmail = guestEmail.Trim();
+			GuestUsername = guestUsername.Trim();
+			StartDate = startDate;
+			EndDate = endDate;
+			GuestsCount = guestsCount;
+			TotalPrice = totalPrice;
+			Status = ReservationStatus.Pending;
+			CreatedAt = DateTime.UtcNow;
+		}
+
+		private static void ValidateReservation(
+			Guid accommodationId,
+			Guid guestId,
+			Guid hostId,
+			string accommodationName,
+			string guestEmail,
+			string guestUsername,
+			DateOnly startDate,
+			DateOnly endDate,
+			int guestsCount,
+			decimal totalPrice)
+		{
+			if (accommodationId == Guid.Empty)
+				throw new ArgumentException("AccommodationId cannot be empty.", nameof(accommodationId));
+
+			if (guestId == Guid.Empty)
+				throw new ArgumentException("GuestId cannot be empty.", nameof(guestId));
+
+			if (hostId == Guid.Empty)
+				throw new ArgumentException("HostId cannot be empty.", nameof(hostId));
 
 			if (string.IsNullOrWhiteSpace(accommodationName))
 				throw new ArgumentException("Accommodation name is required.", nameof(accommodationName));
@@ -52,19 +95,6 @@ namespace ReservationService.Domain.Entities
 
 			if (totalPrice < 0)
 				throw new ArgumentOutOfRangeException(nameof(totalPrice), "Total price cannot be negative.");
-
-			AccommodationId = accommodationId;
-			GuestId = guestId;
-			HostId = hostId;
-			AccommodationName = accommodationName.Trim();
-			GuestEmail = guestEmail.Trim();
-			GuestUsername = guestUsername.Trim();
-			StartDate = startDate;
-			EndDate = endDate;
-			GuestsCount = guestsCount;
-			TotalPrice = totalPrice;
-			Status = ReservationStatus.Pending;
-			CreatedAt = DateTime.UtcNow;
 		}
 	}
 }
