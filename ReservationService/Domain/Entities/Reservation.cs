@@ -29,7 +29,8 @@ namespace ReservationService.Domain.Entities
 			DateOnly startDate,
 			DateOnly endDate,
 			int guestsCount,
-			decimal totalPrice)
+			decimal totalPrice,
+			ReservationStatus status)
 		{
 			ValidateReservation(
 				accommodationId,
@@ -53,7 +54,7 @@ namespace ReservationService.Domain.Entities
 			EndDate = endDate;
 			GuestsCount = guestsCount;
 			TotalPrice = totalPrice;
-			Status = ReservationStatus.Pending;
+			Status = status;
 			CreatedAt = DateTime.UtcNow;
 		}
 

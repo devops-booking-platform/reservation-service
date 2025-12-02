@@ -11,5 +11,9 @@ namespace ReservationService.Services.Implementations
 
         public bool IsAuthenticated =>
             accessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
-    }
+
+		public string? Email => throw new NotImplementedException();
+
+		public string? Username => throw new NotImplementedException();
+	}
 }
