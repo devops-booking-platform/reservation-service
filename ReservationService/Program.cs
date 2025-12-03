@@ -44,7 +44,6 @@ builder.Services.AddSwaggerGenWithAuth();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddOpenApi();
 builder.Services.AddReservationServiceDependencies(builder.Configuration);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
