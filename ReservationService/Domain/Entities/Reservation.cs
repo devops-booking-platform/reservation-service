@@ -7,6 +7,7 @@ namespace ReservationService.Domain.Entities
 		public Guid AccommodationId { get; private set; }
 		public Guid GuestId { get; private set; }
 		public Guid HostId { get; private set; }
+		public Guid IdempotencyKey { get; private set; }
 		public string AccommodationName { get; private set; } = default!;
 		public string GuestEmail { get; private set; } = default!;
 		public string GuestUsername { get; private set; } = default!;
@@ -30,7 +31,8 @@ namespace ReservationService.Domain.Entities
 			DateOnly endDate,
 			int guestsCount,
 			decimal totalPrice,
-			ReservationStatus status)
+			ReservationStatus status,
+			Guid idempotencyKey)
 		{
 			ValidateReservation(
 				accommodationId,
@@ -56,6 +58,7 @@ namespace ReservationService.Domain.Entities
 			TotalPrice = totalPrice;
 			Status = status;
 			CreatedAt = DateTime.UtcNow;
+			IdempotencyKey = idempotencyKey;
 		}
 
 		private static void ValidateReservation(
@@ -88,7 +91,7 @@ namespace ReservationService.Domain.Entities
 			if (string.IsNullOrWhiteSpace(guestUsername))
 				throw new ArgumentException("Guest username is required.", nameof(guestUsername));
 
-			if (endDate <= startDate)
+			if (endDate < startDate)
 				throw new ArgumentOutOfRangeException(nameof(endDate), "End date must be after start date.");
 
 			if (guestsCount <= 0)

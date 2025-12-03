@@ -7,13 +7,19 @@ namespace ReservationService.Controllers
 {
 	[Route("api/reservation")]
 	[ApiController]
-	public class ReservationControllercs(IReservationService reservationService) : ControllerBase
+	public class ReservationController(IReservationService reservationService) : ControllerBase
 	{
 		[Authorize(Roles = "Guest")]
 		[HttpPost]
 		public async Task<IActionResult> Create([FromBody] CreateReservationRequestDTO reservationRequest, CancellationToken ct)
 		{
-			await reservationService.CreateAsync(reservationRequest, ct);
+			if (!Request.Headers.TryGetValue("Idempotency-Key", out var keyValues) ||
+		!Guid.TryParse(keyValues.ToString(), out var idempotencyKey) ||
+		idempotencyKey == Guid.Empty)
+			{
+				return BadRequest("Missing or invalid Idempotency-Key header.");
+			}
+			await reservationService.CreateAsync(reservationRequest, idempotencyKey, ct);
 			return StatusCode(StatusCodes.Status201Created);
 		}
 	}

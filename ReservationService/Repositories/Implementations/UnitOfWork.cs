@@ -1,4 +1,5 @@
-﻿using ReservationService.Data;
+﻿using Microsoft.EntityFrameworkCore.Storage;
+using ReservationService.Data;
 using ReservationService.Repositories.Interfaces;
 
 namespace ReservationService.Repositories.Implementations
@@ -9,5 +10,7 @@ namespace ReservationService.Repositories.Implementations
 	{
 		public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
 			context.SaveChangesAsync(cancellationToken);
+		public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default) =>
+			context.Database.BeginTransactionAsync(ct);
 	}
 }

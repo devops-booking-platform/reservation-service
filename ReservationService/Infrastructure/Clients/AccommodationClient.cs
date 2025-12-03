@@ -10,7 +10,7 @@ namespace ReservationService.Infrastructure.Clients
 		public async Task<AccommodationReservationInfoResponseDTO> GetAccommodationReservationInfoAsync(Guid id, DateOnly start, DateOnly end, int guests, CancellationToken ct = default)
 		{
 			var url = $"/api/accommodations/{id}/reservation-info?start={start:yyyy-MM-dd}&end={end:yyyy-MM-dd}&guests={guests}";
-			var resp = await http.GetAsync(url, ct);
+			using var resp = await http.GetAsync(url, ct);
 
 			if (resp.IsSuccessStatusCode)
 			{

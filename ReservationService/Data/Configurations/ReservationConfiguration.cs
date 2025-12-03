@@ -30,6 +30,9 @@ namespace ReservationService.Data.Configurations
 			builder.Property(x => x.HostId)
 				   .IsRequired();
 
+			builder.Property(x => x.IdempotencyKey)
+				   .IsRequired();
+
 			builder.Property(x => x.AccommodationName)
 				   .IsRequired()
 				   .HasMaxLength(ValidationConstants.MaxStringLength);
@@ -68,6 +71,8 @@ namespace ReservationService.Data.Configurations
 			builder.HasIndex(x => x.AccommodationId);
 			builder.HasIndex(x => x.GuestId);
 			builder.HasIndex(x => x.HostId);
+			builder.HasIndex(x => new { x.GuestId, x.IdempotencyKey }).IsUnique();
+			builder.HasIndex(x => x.IdempotencyKey);
 		}
 	}
 }
