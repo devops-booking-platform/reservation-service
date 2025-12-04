@@ -7,7 +7,7 @@ namespace ReservationService.Infrastructure.Clients
 {
 	public sealed class AccommodationClient(HttpClient http) : IAccommodationClient
 	{
-		public async Task<AccommodationReservationInfoResponseDTO> GetAccommodationReservationInfoAsync(Guid id, DateOnly start, DateOnly end, int guests, CancellationToken ct = default)
+		public async Task<AccommodationReservationInfoResponseDTO> GetAccommodationReservationInfoAsync(Guid id, DateTimeOffset start, DateTimeOffset end, int guests, CancellationToken ct = default)
 		{
 			var url = $"/api/accommodations/{id}/reservation-info?start={start:yyyy-MM-dd}&end={end:yyyy-MM-dd}&guests={guests}";
 			using var resp = await http.GetAsync(url, ct);

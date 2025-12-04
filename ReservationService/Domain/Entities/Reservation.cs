@@ -11,8 +11,8 @@ namespace ReservationService.Domain.Entities
 		public string AccommodationName { get; private set; } = default!;
 		public string GuestEmail { get; private set; } = default!;
 		public string GuestUsername { get; private set; } = default!;
-		public DateOnly StartDate { get; private set; }
-		public DateOnly EndDate { get; private set; }
+		public DateTimeOffset StartDate { get; private set; }
+		public DateTimeOffset EndDate { get; private set; }
 		public int GuestsCount { get; private set; }
 		public ReservationStatus Status { get; private set; }
 		public DateTime CreatedAt { get; private set; }
@@ -27,8 +27,8 @@ namespace ReservationService.Domain.Entities
 			string accommodationName,
 			string guestEmail,
 			string guestUsername,
-			DateOnly startDate,
-			DateOnly endDate,
+			DateTimeOffset startDate,
+			DateTimeOffset endDate,
 			int guestsCount,
 			decimal totalPrice,
 			ReservationStatus status,
@@ -68,8 +68,8 @@ namespace ReservationService.Domain.Entities
 			string accommodationName,
 			string guestEmail,
 			string guestUsername,
-			DateOnly startDate,
-			DateOnly endDate,
+			DateTimeOffset startDate,
+			DateTimeOffset endDate,
 			int guestsCount,
 			decimal totalPrice)
 		{

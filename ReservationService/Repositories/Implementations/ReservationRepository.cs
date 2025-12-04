@@ -8,7 +8,7 @@ namespace ReservationService.Repositories.Implementations
 {
 	public class ReservationRepository(ApplicationDbContext context) : Repository<Reservation>(context), IReservationRepository
 	{
-		public Task<int> RejectOverlappingPendingAsync(Guid accommodationId, DateOnly startDate, DateOnly endDate, CancellationToken ct)
+		public Task<int> RejectOverlappingPendingAsync(Guid accommodationId, DateTimeOffset startDate, DateTimeOffset endDate, CancellationToken ct)
 		{
 			return Context.Reservations
 				.Where(r => r.AccommodationId == accommodationId
@@ -19,7 +19,7 @@ namespace ReservationService.Repositories.Implementations
 					.SetProperty(r => r.Status, ReservationStatus.Rejected), ct);
 		}
 
-		public Task<bool> HasOverlappingApprovedReservationAsync(Guid accommodationId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default)
+		public Task<bool> HasOverlappingApprovedReservationAsync(Guid accommodationId, DateTimeOffset startDate, DateTimeOffset endDate, CancellationToken ct = default)
 		{
 			return Context.Reservations.AnyAsync(x =>
 			x.AccommodationId == accommodationId &&

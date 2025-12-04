@@ -38,8 +38,8 @@ namespace ReservationService.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateOnly>("EndDate")
-                        .HasColumnType("date");
+                    b.Property<DateTimeOffset>("EndDate")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("GuestEmail")
                         .IsRequired()
@@ -63,8 +63,8 @@ namespace ReservationService.Migrations
                     b.Property<Guid>("IdempotencyKey")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateOnly>("StartDate")
-                        .HasColumnType("date");
+                    b.Property<DateTimeOffset>("StartDate")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Status")
                         .IsRequired()

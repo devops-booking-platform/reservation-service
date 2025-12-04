@@ -57,7 +57,7 @@ namespace ReservationService.Services.Implementations
 
 		private static void ValidateRequest(CreateReservationRequestDTO request)
 		{
-			var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
+			var todayUtc = DateTime.UtcNow;
 
 			if (request.StartDate < todayUtc)
 				throw new PastDateException("Cannot create reservation for past dates.");
@@ -145,7 +145,7 @@ namespace ReservationService.Services.Implementations
 				ct);
 		}
 
-		private async Task EnsureNoApprovedOverlapAsync(Guid accommodationId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default)
+		private async Task EnsureNoApprovedOverlapAsync(Guid accommodationId, DateTimeOffset startDate, DateTimeOffset endDate, CancellationToken ct = default)
 		{
 			var hasOverlap = await reservationRepository.HasOverlappingApprovedReservationAsync(accommodationId, startDate, endDate, ct);
 			if (hasOverlap)

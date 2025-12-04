@@ -46,12 +46,10 @@ namespace ReservationService.Data.Configurations
 				   .HasMaxLength(ValidationConstants.MaxStringLength);
 
 			builder.Property(x => x.StartDate)
-				   .IsRequired()
-				   .HasColumnType("date");
+				   .IsRequired();
 
 			builder.Property(x => x.EndDate)
-				   .IsRequired()
-				   .HasColumnType("date");
+				   .IsRequired();
 
 			builder.Property(x => x.GuestsCount)
 				   .IsRequired();
