@@ -11,7 +11,7 @@ on:
       - main
 env:
   DOTNET_VERSION: "8.0.x"
-  SOLUTION_PATH: "./ReservationService/ReservationService.sln"
+  SOLUTION_PATH: "./ReservationService.sln"
 
 jobs:
   build:

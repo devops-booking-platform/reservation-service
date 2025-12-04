@@ -12,8 +12,8 @@ using ReservationService.Data;
 namespace ReservationService.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251203181915_idempotency")]
-    partial class idempotency
+    [Migration("20251204164947_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -41,8 +41,8 @@ namespace ReservationService.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateOnly>("EndDate")
-                        .HasColumnType("date");
+                    b.Property<DateTimeOffset>("EndDate")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("GuestEmail")
                         .IsRequired()
@@ -66,8 +66,8 @@ namespace ReservationService.Migrations
                     b.Property<Guid>("IdempotencyKey")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateOnly>("StartDate")
-                        .HasColumnType("date");
+                    b.Property<DateTimeOffset>("StartDate")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -91,8 +91,6 @@ namespace ReservationService.Migrations
 
                     b.ToTable("Reservations", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Reservations_Dates_Valid", "[EndDate] > [StartDate]");
-
                             t.HasCheckConstraint("CK_Reservations_GuestsCount_Positive", "[GuestsCount] > 0");
 
                             t.HasCheckConstraint("CK_Reservations_TotalPrice_NonNegative", "[TotalPrice] >= 0");

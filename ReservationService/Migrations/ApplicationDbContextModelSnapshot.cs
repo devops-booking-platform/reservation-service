@@ -88,8 +88,6 @@ namespace ReservationService.Migrations
 
                     b.ToTable("Reservations", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Reservations_Dates_Valid", "[EndDate] > [StartDate]");
-
                             t.HasCheckConstraint("CK_Reservations_GuestsCount_Positive", "[GuestsCount] > 0");
 
                             t.HasCheckConstraint("CK_Reservations_TotalPrice_NonNegative", "[TotalPrice] >= 0");
