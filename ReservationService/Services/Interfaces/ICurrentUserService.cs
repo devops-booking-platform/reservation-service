@@ -3,7 +3,9 @@
     public interface ICurrentUserService
     {
         Guid? UserId { get; }
-        string? Role { get; }
+		string? Email { get; }
+		string? Username { get; }
+		string? Role { get; }
         bool IsAuthenticated { get; }
     }
 }

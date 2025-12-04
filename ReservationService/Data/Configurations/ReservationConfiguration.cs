@@ -12,7 +12,6 @@ namespace ReservationService.Data.Configurations
 			builder.ToTable("Reservations", t =>
 			{
 				t.HasCheckConstraint("CK_Reservations_GuestsCount_Positive", "[GuestsCount] > 0");
-				t.HasCheckConstraint("CK_Reservations_Dates_Valid", "[EndDate] > [StartDate]");
 				t.HasCheckConstraint("CK_Reservations_TotalPrice_NonNegative", "[TotalPrice] >= 0");
 			});
 
@@ -30,6 +29,9 @@ namespace ReservationService.Data.Configurations
 			builder.Property(x => x.HostId)
 				   .IsRequired();
 
+			builder.Property(x => x.IdempotencyKey)
+				   .IsRequired();
+
 			builder.Property(x => x.AccommodationName)
 				   .IsRequired()
 				   .HasMaxLength(ValidationConstants.MaxStringLength);
@@ -43,12 +45,10 @@ namespace ReservationService.Data.Configurations
 				   .HasMaxLength(ValidationConstants.MaxStringLength);
 
 			builder.Property(x => x.StartDate)
-				   .IsRequired()
-				   .HasColumnType("date");
+				   .IsRequired();
 
 			builder.Property(x => x.EndDate)
-				   .IsRequired()
-				   .HasColumnType("date");
+				   .IsRequired();
 
 			builder.Property(x => x.GuestsCount)
 				   .IsRequired();
@@ -68,6 +68,8 @@ namespace ReservationService.Data.Configurations
 			builder.HasIndex(x => x.AccommodationId);
 			builder.HasIndex(x => x.GuestId);
 			builder.HasIndex(x => x.HostId);
+			builder.HasIndex(x => new { x.GuestId, x.IdempotencyKey }).IsUnique();
+			builder.HasIndex(x => x.IdempotencyKey);
 		}
 	}
 }

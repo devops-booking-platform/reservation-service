@@ -7,11 +7,12 @@ namespace ReservationService.Domain.Entities
 		public Guid AccommodationId { get; private set; }
 		public Guid GuestId { get; private set; }
 		public Guid HostId { get; private set; }
+		public Guid IdempotencyKey { get; private set; }
 		public string AccommodationName { get; private set; } = default!;
 		public string GuestEmail { get; private set; } = default!;
 		public string GuestUsername { get; private set; } = default!;
-		public DateOnly StartDate { get; private set; }
-		public DateOnly EndDate { get; private set; }
+		public DateTimeOffset StartDate { get; private set; }
+		public DateTimeOffset EndDate { get; private set; }
 		public int GuestsCount { get; private set; }
 		public ReservationStatus Status { get; private set; }
 		public DateTime CreatedAt { get; private set; }
@@ -26,10 +27,12 @@ namespace ReservationService.Domain.Entities
 			string accommodationName,
 			string guestEmail,
 			string guestUsername,
-			DateOnly startDate,
-			DateOnly endDate,
+			DateTimeOffset startDate,
+			DateTimeOffset endDate,
 			int guestsCount,
-			decimal totalPrice)
+			decimal totalPrice,
+			ReservationStatus status,
+			Guid idempotencyKey)
 		{
 			ValidateReservation(
 				accommodationId,
@@ -53,8 +56,9 @@ namespace ReservationService.Domain.Entities
 			EndDate = endDate;
 			GuestsCount = guestsCount;
 			TotalPrice = totalPrice;
-			Status = ReservationStatus.Pending;
+			Status = status;
 			CreatedAt = DateTime.UtcNow;
+			IdempotencyKey = idempotencyKey;
 		}
 
 		private static void ValidateReservation(
@@ -64,8 +68,8 @@ namespace ReservationService.Domain.Entities
 			string accommodationName,
 			string guestEmail,
 			string guestUsername,
-			DateOnly startDate,
-			DateOnly endDate,
+			DateTimeOffset startDate,
+			DateTimeOffset endDate,
 			int guestsCount,
 			decimal totalPrice)
 		{
@@ -87,7 +91,7 @@ namespace ReservationService.Domain.Entities
 			if (string.IsNullOrWhiteSpace(guestUsername))
 				throw new ArgumentException("Guest username is required.", nameof(guestUsername));
 
-			if (endDate <= startDate)
+			if (endDate < startDate)
 				throw new ArgumentOutOfRangeException(nameof(endDate), "End date must be after start date.");
 
 			if (guestsCount <= 0)
