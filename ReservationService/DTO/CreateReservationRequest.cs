@@ -1,6 +1,6 @@
 ﻿namespace ReservationService.DTO
 {
-	public class CreateReservationRequestDTO
+	public class CreateReservationRequest
 	{
 		public Guid AccommodationId { get; set; }
 		public DateTimeOffset StartDate { get; set; }

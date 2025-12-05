@@ -12,7 +12,7 @@ namespace ReservationService.Controllers
         [Authorize(Roles = "Guest")]
         [HttpPost]
         public async Task<IActionResult> Create(
-        [FromBody] CreateReservationRequestDTO reservationRequest,
+        [FromBody] CreateReservationRequest reservationRequest,
         [FromHeader(Name = "Idempotency-Key")] Guid idempotencyKey,
         CancellationToken ct)
         {
@@ -37,6 +37,22 @@ namespace ReservationService.Controllers
 		{
 			await reservationService.CancelAsync(reservationId, ct);
 			return NoContent();
+		}
+		
+		[Authorize(Roles = "Host")]
+		[HttpPost("approve/{reservationId}")]
+		public async Task<IActionResult> ConfirmReservation(Guid reservationId, CancellationToken ct)
+		{
+			await reservationService.ApproveAsync(reservationId, ct);
+			return StatusCode(StatusCodes.Status202Accepted);
+		}
+		
+		[Authorize(Roles = "Host")]
+		[HttpPost("decline/{reservationId}")]
+		public async Task<IActionResult> DeclineReservation(Guid reservationId, CancellationToken ct)
+		{
+			await reservationService.DeclineAsync(reservationId, ct);
+			return StatusCode(StatusCodes.Status202Accepted);
 		}
 	}
 }
