@@ -23,19 +23,19 @@ namespace ReservationService.Services.Implementations
 
 			ValidateRequest(request);
 
-			var accommodationReservationinfo = await GetReservationInfoAsync(request, ct);
+			var accommodationReservationInfo = await GetReservationInfoAsync(request, ct);
 
 			await using var transaction = await unitOfWork.BeginTransactionAsync(ct);
 
 			await LockAccommodationAsync(request.AccommodationId, ct);
 
-			EnsureGuestsWithinCapacity(request.GuestsCount, accommodationReservationinfo.MaxGuests);
+			EnsureGuestsWithinCapacity(request.GuestsCount, accommodationReservationInfo.MaxGuests);
 
 			await EnsureNoApprovedOverlapAsync(request.AccommodationId, request.StartDate, request.EndDate, ct);
 
-			var status = accommodationReservationinfo.IsAutoAcceptEnabled ? ReservationStatus.Approved : ReservationStatus.Pending;
+			var status = accommodationReservationInfo.IsAutoAcceptEnabled ? ReservationStatus.Approved : ReservationStatus.Pending;
 
-			var reservation = BuildReservation(userId, idempotencyKey, request, accommodationReservationinfo, status);
+			var reservation = BuildReservation(userId, idempotencyKey, request, accommodationReservationInfo, status);
 
 			await reservationRepository.AddAsync(reservation);
 
@@ -160,6 +160,41 @@ namespace ReservationService.Services.Implementations
 				.GetApprovedReservationsByGuestIdAsync(ct, guestId);
 
 			return approvedReservations;
+		}
+
+		public async Task ApproveAsync(Guid reservationId, CancellationToken ct)
+		{
+			GetCurrentUserIdOrThrow();
+
+			var reservation = await reservationRepository.GetByIdAsync(reservationId);
+
+			if (reservation == null)
+			{
+				throw new NotFoundException("Reservation not found.");
+			}
+			
+			await EnsureNoApprovedOverlapAsync(reservation.AccommodationId, reservation.StartDate, reservation.EndDate,
+				ct);
+
+			reservation.Approve();
+
+			await unitOfWork.SaveChangesAsync(ct);
+		}
+
+		public async Task DeclineAsync(Guid reservationId, CancellationToken ct)
+		{
+			GetCurrentUserIdOrThrow();
+
+			var reservation = await reservationRepository.GetByIdAsync(reservationId);
+
+			if (reservation == null)
+			{
+				throw new NotFoundException("Reservation not found.");
+			}
+			
+			reservation.Decline();
+
+			await unitOfWork.SaveChangesAsync(ct);
 		}
 
 		public async Task CancelAsync(Guid reservationId, CancellationToken ct)
