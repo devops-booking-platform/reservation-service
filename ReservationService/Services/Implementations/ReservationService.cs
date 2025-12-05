@@ -7,214 +7,228 @@ using ReservationService.Infrastructure.Clients;
 using ReservationService.Repositories.Interfaces;
 using ReservationService.Services.Interfaces;
 
-namespace ReservationService.Services.Implementations
+namespace ReservationService.Services.Implementations;
+
+public class ReservationService(
+    ICurrentUserService currentUserService,
+    IReservationRepository reservationRepository,
+    IAccommodationClient accommodationClient,
+    IUnitOfWork unitOfWork) : IReservationService
 {
-	public class ReservationService(
-		ICurrentUserService currentUserService,
-		IReservationRepository reservationRepository,
-		IAccommodationClient accommodationClient,
-		IUnitOfWork unitOfWork) : IReservationService
-	{
-		public async Task CreateAsync(CreateReservationRequestDTO request, Guid idempotencyKey, CancellationToken ct = default)
-		{
-			var userId = GetCurrentUserIdOrThrow();
+    public async Task CreateAsync(CreateReservationRequest request, Guid idempotencyKey,
+        CancellationToken ct = default)
+    {
+        var userId = GetCurrentUserIdOrThrow();
 
-			await EnsureNotReplayedAsync(userId, idempotencyKey, ct);
+        await EnsureNotReplayedAsync(userId, idempotencyKey, ct);
 
-			ValidateRequest(request);
+        ValidateRequest(request);
 
-			var accommodationReservationInfo = await GetReservationInfoAsync(request, ct);
+        var accommodationReservationInfo = await GetReservationInfoAsync(request, ct);
 
-			await using var transaction = await unitOfWork.BeginTransactionAsync(ct);
+        await using var transaction = await unitOfWork.BeginTransactionAsync(ct);
 
-			await LockAccommodationAsync(request.AccommodationId, ct);
+        await LockAccommodationAsync(request.AccommodationId, ct);
 
-			EnsureGuestsWithinCapacity(request.GuestsCount, accommodationReservationInfo.MaxGuests);
+        EnsureGuestsWithinCapacity(request.GuestsCount, accommodationReservationInfo.MaxGuests);
 
-			await EnsureNoApprovedOverlapAsync(request.AccommodationId, request.StartDate, request.EndDate, ct);
+        await EnsureNoApprovedOverlapAsync(request.AccommodationId, request.StartDate, request.EndDate, ct);
 
-			var status = accommodationReservationInfo.IsAutoAcceptEnabled ? ReservationStatus.Approved : ReservationStatus.Pending;
+        var status = accommodationReservationInfo.IsAutoAcceptEnabled
+            ? ReservationStatus.Approved
+            : ReservationStatus.Pending;
 
-			var reservation = BuildReservation(userId, idempotencyKey, request, accommodationReservationInfo, status);
+        var reservation = BuildReservation(userId, idempotencyKey, request, accommodationReservationInfo, status);
 
-			await reservationRepository.AddAsync(reservation);
+        await reservationRepository.AddAsync(reservation);
 
-			await SaveChangesHandlingIdempotencyAsync(ct);
+        await SaveChangesHandlingIdempotencyAsync(ct);
 
-			await RejectPendingIfApprovedAsync(status, request, ct);
+        await RejectPendingIfApprovedAsync(status, request, ct);
 
-			await transaction.CommitAsync(ct);
-		}
+        await transaction.CommitAsync(ct);
+    }
 
-		private Guid GetCurrentUserIdOrThrow()
-			=> currentUserService.UserId ?? throw new UnauthorizedAccessException();
+    private Guid GetCurrentUserIdOrThrow()
+        => currentUserService.UserId ?? throw new UnauthorizedAccessException();
 
-		private async Task EnsureNotReplayedAsync(Guid userId, Guid idempotencyKey, CancellationToken ct)
-		{
-			if (await reservationRepository.ExistsByIdempotencyKey(userId, idempotencyKey, ct))
-				throw new IdempotencyReplayException("Same request found");
-		}
+    private async Task EnsureNotReplayedAsync(Guid userId, Guid idempotencyKey, CancellationToken ct)
+    {
+        if (await reservationRepository.ExistsByIdempotencyKey(userId, idempotencyKey, ct))
+            throw new IdempotencyReplayException("Same request found");
+    }
 
-		private static void ValidateRequest(CreateReservationRequestDTO request)
-		{
-			var todayUtc = DateTime.UtcNow;
+    private static void ValidateRequest(CreateReservationRequest request)
+    {
+        var todayUtc = DateTime.UtcNow;
 
-			if (request.StartDate < todayUtc)
-				throw new PastDateException("Cannot create reservation for past dates.");
+        if (request.StartDate < todayUtc)
+            throw new PastDateException("Cannot create reservation for past dates.");
 
-			if (request.StartDate >= request.EndDate)
-				throw new ArgumentOutOfRangeException(nameof(request.EndDate),
-					"End date must be after start date.");
+        if (request.StartDate >= request.EndDate)
+            throw new ArgumentOutOfRangeException(nameof(request.EndDate),
+                "End date must be after start date.");
 
-			if (request.GuestsCount <= 0)
-				throw new ArgumentOutOfRangeException(nameof(request.GuestsCount),
-					"Guests count must be a positive number.");
-		}
+        if (request.GuestsCount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(request.GuestsCount),
+                "Guests count must be a positive number.");
+    }
 
-		private Task<AccommodationReservationInfoResponseDTO> GetReservationInfoAsync(CreateReservationRequestDTO request, CancellationToken ct)
-			=> accommodationClient.GetAccommodationReservationInfoAsync(
-				request.AccommodationId,
-				request.StartDate,
-				request.EndDate,
-				request.GuestsCount,
-				ct);
+    private Task<AccommodationReservationInfoResponseDTO> GetReservationInfoAsync(
+        CreateReservationRequest request, CancellationToken ct)
+        => accommodationClient.GetAccommodationReservationInfoAsync(
+            request.AccommodationId,
+            request.StartDate,
+            request.EndDate,
+            request.GuestsCount,
+            ct);
 
-		private async Task LockAccommodationAsync(Guid accommodationId, CancellationToken ct)
-		{
-			try
-			{
-				await reservationRepository.AcquireAccommodationLockAsync(accommodationId, ct);
-			}
-			catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 50001)
-			{
-				throw new ConflictException("Reservation is being processed. Please try again.");
-			}
-		}
+    private async Task LockAccommodationAsync(Guid accommodationId, CancellationToken ct)
+    {
+        try
+        {
+            await reservationRepository.AcquireAccommodationLockAsync(accommodationId, ct);
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 50001)
+        {
+            throw new ConflictException("Reservation is being processed. Please try again.");
+        }
+    }
 
-		private static void EnsureGuestsWithinCapacity(int guestsCount, int maxGuests)
-		{
-			if (guestsCount > maxGuests)
-				throw new MaxGuestsExceededException("Guests count exceeds accommodation capacity.");
-		}
+    private static void EnsureGuestsWithinCapacity(int guestsCount, int maxGuests)
+    {
+        if (guestsCount > maxGuests)
+            throw new MaxGuestsExceededException("Guests count exceeds accommodation capacity.");
+    }
 
-		private Reservation BuildReservation(
-			Guid userId,
-			Guid idempotencyKey,
-			CreateReservationRequestDTO request,
-			AccommodationReservationInfoResponseDTO info,
-			ReservationStatus status)
-		{
-			return new Reservation(
-				accommodationId: request.AccommodationId,
-				guestId: userId,
-				hostId: info.HostId,
-				idempotencyKey: idempotencyKey,
-				accommodationName: info.Name,
-				guestEmail: currentUserService.Email ?? throw new InvalidOperationException("Email missing in token."),
-				guestUsername: currentUserService.Username ?? throw new InvalidOperationException("Username missing in token."),
-				startDate: request.StartDate,
-				endDate: request.EndDate,
-				guestsCount: request.GuestsCount,
-				totalPrice: info.TotalPrice,
-				status: status
-			);
-		}
+    private Reservation BuildReservation(
+        Guid userId,
+        Guid idempotencyKey,
+        CreateReservationRequest request,
+        AccommodationReservationInfoResponseDTO info,
+        ReservationStatus status)
+    {
+        return new Reservation(
+            accommodationId: request.AccommodationId,
+            guestId: userId,
+            hostId: info.HostId,
+            idempotencyKey: idempotencyKey,
+            accommodationName: info.Name,
+            guestEmail: currentUserService.Email ?? throw new InvalidOperationException("Email missing in token."),
+            guestUsername: currentUserService.Username ??
+                           throw new InvalidOperationException("Username missing in token."),
+            startDate: request.StartDate,
+            endDate: request.EndDate,
+            guestsCount: request.GuestsCount,
+            totalPrice: info.TotalPrice,
+            status: status
+        );
+    }
 
-		private async Task SaveChangesHandlingIdempotencyAsync(CancellationToken ct)
-		{
-			try
-			{
-				await unitOfWork.SaveChangesAsync(ct);
-			}
-			catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx
-											  && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
-			{
-				throw new IdempotencyReplayException("Same request found");
-			}
-		}
+    private async Task SaveChangesHandlingIdempotencyAsync(CancellationToken ct)
+    {
+        try
+        {
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx
+                                           && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+        {
+            throw new IdempotencyReplayException("Same request found");
+        }
+    }
 
-		private Task RejectPendingIfApprovedAsync(ReservationStatus status, CreateReservationRequestDTO request, CancellationToken ct)
-		{
-			if (status != ReservationStatus.Approved)
-				return Task.CompletedTask;
+    private Task RejectPendingIfApprovedAsync(ReservationStatus status, CreateReservationRequest request,
+        CancellationToken ct)
+    {
+        if (status != ReservationStatus.Approved)
+            return Task.CompletedTask;
 
-			return reservationRepository.RejectOverlappingPendingAsync(
-				request.AccommodationId,
-				request.StartDate,
-				request.EndDate,
-				ct);
-		}
+        return reservationRepository.RejectOverlappingPendingAsync(
+            request.AccommodationId,
+            request.StartDate,
+            request.EndDate,
+            ct);
+    }
 
-		private async Task EnsureNoApprovedOverlapAsync(Guid accommodationId, DateTimeOffset startDate, DateTimeOffset endDate, CancellationToken ct = default)
-		{
-			var hasOverlap = await reservationRepository.HasOverlappingApprovedReservationAsync(accommodationId, startDate, endDate, ct);
-			if (hasOverlap)
-				throw new ConflictException("Accommodation already has an approved reservation for the selected dates.");
-		}
+    private async Task EnsureNoApprovedOverlapAsync(Guid accommodationId, DateTimeOffset startDate,
+        DateTimeOffset endDate, CancellationToken ct = default)
+    {
+        var hasOverlap =
+            await reservationRepository.HasOverlappingApprovedReservationAsync(accommodationId, startDate, endDate,
+                ct);
+        if (hasOverlap)
+            throw new ConflictException(
+                "Accommodation already has an approved reservation for the selected dates.");
+    }
 
-		public async Task<IReadOnlyList<GuestApprovedReservationResponseDTO>> GetApprovedForGuestAsync(CancellationToken ct)
-		{
-			var guestId = GetCurrentUserIdOrThrow();
+    public async Task<IReadOnlyList<GuestApprovedReservationResponseDTO>> GetApprovedForGuestAsync(
+        CancellationToken ct)
+    {
+        var guestId = GetCurrentUserIdOrThrow();
 
-			var approvedReservations = await reservationRepository
-				.GetApprovedReservationsByGuestIdAsync(ct, guestId);
+        var approvedReservations = await reservationRepository
+            .GetApprovedReservationsByGuestIdAsync(ct, guestId);
 
-			return approvedReservations;
-		}
+        return approvedReservations;
+    }
 
-		public async Task ApproveAsync(Guid reservationId, CancellationToken ct)
-		{
-			GetCurrentUserIdOrThrow();
+    public async Task ApproveAsync(Guid reservationId, CancellationToken ct)
+    {
+        GetCurrentUserIdOrThrow();
 
-			var reservation = await reservationRepository.GetByIdAsync(reservationId);
+        var reservation = await reservationRepository.GetByIdAsync(reservationId);
 
-			if (reservation == null)
-			{
-				throw new NotFoundException("Reservation not found.");
-			}
-			
-			await EnsureNoApprovedOverlapAsync(reservation.AccommodationId, reservation.StartDate, reservation.EndDate,
-				ct);
+        if (reservation == null)
+        {
+            throw new NotFoundException("Reservation not found.");
+        }
 
-			reservation.Approve();
+        await EnsureNoApprovedOverlapAsync(reservation.AccommodationId, reservation.StartDate, reservation.EndDate,
+            ct);
 
-			await unitOfWork.SaveChangesAsync(ct);
-		}
+        reservation.Approve();
 
-		public async Task DeclineAsync(Guid reservationId, CancellationToken ct)
-		{
-			GetCurrentUserIdOrThrow();
+        await unitOfWork.SaveChangesAsync(ct);
+    }
 
-			var reservation = await reservationRepository.GetByIdAsync(reservationId);
+    public async Task DeclineAsync(Guid reservationId, CancellationToken ct)
+    {
+        GetCurrentUserIdOrThrow();
 
-			if (reservation == null)
-			{
-				throw new NotFoundException("Reservation not found.");
-			}
-			
-			reservation.Decline();
+        var reservation = await reservationRepository.GetByIdAsync(reservationId);
 
-			await unitOfWork.SaveChangesAsync(ct);
-		}
+        if (reservation == null)
+        {
+            throw new NotFoundException("Reservation not found.");
+        }
 
-		public async Task CancelAsync(Guid reservationId, CancellationToken ct)
-		{
-			var guestId = GetCurrentUserIdOrThrow();
+        reservation.Decline();
 
-			var reservation = await reservationRepository.GetByIdAsync(reservationId);
-			ValidateCancellationRequest(reservation, guestId);
+        await unitOfWork.SaveChangesAsync(ct);
+    }
 
-			reservation!.Cancel();
+    public async Task CancelAsync(Guid reservationId, CancellationToken ct)
+    {
+        var guestId = GetCurrentUserIdOrThrow();
 
-			await unitOfWork.SaveChangesAsync(ct);
-		}
-		private static void ValidateCancellationRequest(Reservation? reservation, Guid guestId)
-		{
-			if (reservation is null)
-				throw new NotFoundException("Reservation not found");
+        var reservation = await reservationRepository.GetByIdAsync(reservationId);
+        ValidateCancellationRequest(reservation, guestId);
 
-			if (reservation.GuestId != guestId)
-				throw new UnauthorizedAccessException("You don't have access to this reservation.");
-		}
-	}
+        reservation!.Cancel();
+
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+
+    private static void ValidateCancellationRequest(Reservation? reservation, Guid guestId)
+    {
+        if (reservation is null)
+            throw new NotFoundException("Reservation not found");
+
+        if (reservation.Status == ReservationStatus.Rejected)
+            throw new UnauthorizedAccessException("This reservation has been rejected.");
+
+        if (reservation.GuestId != guestId)
+            throw new UnauthorizedAccessException("You don't have access to this reservation.");
+    }
 }

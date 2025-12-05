@@ -12,7 +12,7 @@ namespace ReservationService.Controllers
         [Authorize(Roles = "Guest")]
         [HttpPost]
         public async Task<IActionResult> Create(
-        [FromBody] CreateReservationRequestDTO reservationRequest,
+        [FromBody] CreateReservationRequest reservationRequest,
         [FromHeader(Name = "Idempotency-Key")] Guid idempotencyKey,
         CancellationToken ct)
         {
