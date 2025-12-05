@@ -5,7 +5,6 @@
         Pending,
         Approved,
         Rejected,
-        CancelledByGuest,
-        CancelledByHost
+        CancelledByGuest
     }
 }

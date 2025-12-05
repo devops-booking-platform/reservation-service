@@ -2,6 +2,7 @@
 using ReservationService.Data;
 using ReservationService.Domain.Entities;
 using ReservationService.Domain.Enums;
+using ReservationService.DTO;
 using ReservationService.Repositories.Interfaces;
 
 namespace ReservationService.Repositories.Implementations
@@ -47,6 +48,25 @@ namespace ReservationService.Repositories.Implementations
 		public Task<bool> ExistsByIdempotencyKey(Guid guestId, Guid idempotencyKey, CancellationToken ct = default)
 		{
 			return Context.Reservations.AnyAsync(x => x.IdempotencyKey == idempotencyKey && x.GuestId == guestId, ct);
+		}
+
+		public async Task<IReadOnlyList<GuestApprovedReservationResponseDTO>> GetApprovedReservationsByGuestIdAsync(
+		CancellationToken ct,
+		Guid guestId)
+		{
+			return await Context.Reservations
+				.AsNoTracking()
+				.Where(x => x.GuestId == guestId && x.Status == ReservationStatus.Approved)
+				.Select(r => new GuestApprovedReservationResponseDTO
+				{
+					Id = r.Id,
+					AccommodationName = r.AccommodationName,
+					StartDate = r.StartDate,
+					EndDate = r.EndDate,
+					TotalPrice = r.TotalPrice,
+					GuestsCount = r.GuestsCount
+				})
+				.ToListAsync(ct);
 		}
 	}
 }

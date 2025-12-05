@@ -5,7 +5,7 @@ using ReservationService.Services.Interfaces;
 
 namespace ReservationService.Controllers
 {
-	[Route("api/reservation")]
+	[Route("api/reservations")]
 	[ApiController]
 	public class ReservationController(IReservationService reservationService) : ControllerBase
 	{
@@ -22,5 +22,21 @@ namespace ReservationService.Controllers
             await reservationService.CreateAsync(reservationRequest, idempotencyKey, ct);
             return StatusCode(StatusCodes.Status201Created);
         }
-    }
+
+        [Authorize(Roles = "Guest")]
+        [HttpGet("approved")]
+        public async Task<IActionResult> GetApproved(CancellationToken ct) 
+        {
+			var approvedReservations = await reservationService.GetApprovedForGuestAsync(ct);
+			return Ok(approvedReservations);
+        }
+
+		[Authorize(Roles = "Guest")]
+		[HttpPatch("{reservationId:guid}/cancel")]
+		public async Task<IActionResult> Cancel([FromRoute] Guid reservationId, CancellationToken ct)
+		{
+			await reservationService.CancelAsync(reservationId, ct);
+			return NoContent();
+		}
+	}
 }
