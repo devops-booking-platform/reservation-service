@@ -190,6 +190,13 @@ public class ReservationService(
         reservation.Approve();
 
         await unitOfWork.SaveChangesAsync(ct);
+
+        await reservationRepository.RejectOverlappingPendingAsync(
+            reservation.AccommodationId,
+            reservation.StartDate,
+            reservation.EndDate,
+            ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 
     public async Task DeclineAsync(Guid reservationId, CancellationToken ct)
