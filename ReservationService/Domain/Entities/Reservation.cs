@@ -18,8 +18,23 @@ namespace ReservationService.Domain.Entities
 		public DateTime CreatedAt { get; private set; }
 		public decimal TotalPrice { get; private set; }
 
-		private Reservation() { } 
-
+		private Reservation() { }
+		public void Cancel()
+		{
+			if (Status == ReservationStatus.CancelledByGuest)
+				return;
+			ValidateCancellation();
+			Status = ReservationStatus.CancelledByGuest;
+		}
+		private void ValidateCancellation()
+		{
+			if (Status != ReservationStatus.Approved)
+				throw new InvalidOperationException("Only approved reservations can be cancelled.");
+			var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
+			var startUtc = DateOnly.FromDateTime(StartDate.UtcDateTime);
+			if (todayUtc >= startUtc)
+				throw new InvalidOperationException("Reservation can be cancelled only until the day before start date.");
+		}
 		public Reservation(
 			Guid accommodationId,
 			Guid guestId,

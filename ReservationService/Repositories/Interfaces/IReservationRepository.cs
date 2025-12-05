@@ -1,4 +1,6 @@
 ﻿using ReservationService.Domain.Entities;
+using ReservationService.DTO;
+using System.Threading.Tasks;
 
 namespace ReservationService.Repositories.Interfaces
 {
@@ -8,5 +10,6 @@ namespace ReservationService.Repositories.Interfaces
 		Task<bool> HasOverlappingApprovedReservationAsync(Guid accommodationId, DateTimeOffset startDate, DateTimeOffset endDate, CancellationToken ct = default);
 		Task AcquireAccommodationLockAsync(Guid accommodationId, CancellationToken ct = default);
 		Task<bool> ExistsByIdempotencyKey(Guid guestId, Guid idempotencyKey, CancellationToken ct = default);
+		Task<IReadOnlyList<GuestApprovedReservationResponseDTO>> GetApprovedReservationsByGuestIdAsync(CancellationToken ct, Guid GuestId);
 	}
 }

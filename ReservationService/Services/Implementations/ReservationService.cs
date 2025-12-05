@@ -151,5 +151,35 @@ namespace ReservationService.Services.Implementations
 			if (hasOverlap)
 				throw new ConflictException("Accommodation already has an approved reservation for the selected dates.");
 		}
+
+		public async Task<IReadOnlyList<GuestApprovedReservationResponseDTO>> GetApprovedForGuestAsync(CancellationToken ct)
+		{
+			var guestId = GetCurrentUserIdOrThrow();
+
+			var approvedReservations = await reservationRepository
+				.GetApprovedReservationsByGuestIdAsync(ct, guestId);
+
+			return approvedReservations;
+		}
+
+		public async Task CancelAsync(Guid reservationId, CancellationToken ct)
+		{
+			var guestId = GetCurrentUserIdOrThrow();
+
+			var reservation = await reservationRepository.GetByIdAsync(reservationId);
+			ValidateCancellationRequest(reservation, guestId);
+
+			reservation!.Cancel();
+
+			await unitOfWork.SaveChangesAsync(ct);
+		}
+		private static void ValidateCancellationRequest(Reservation? reservation, Guid guestId)
+		{
+			if (reservation is null)
+				throw new NotFoundException("Reservation not found");
+
+			if (reservation.GuestId != guestId)
+				throw new UnauthorizedAccessException("You don't have access to this reservation.");
+		}
 	}
 }
