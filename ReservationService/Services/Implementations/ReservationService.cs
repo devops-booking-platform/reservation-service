@@ -238,4 +238,16 @@ public class ReservationService(
         if (reservation.GuestId != guestId)
             throw new UnauthorizedAccessException("You don't have access to this reservation.");
     }
+
+	public async Task<bool> GetGuestDeletionEligibilityAsync(Guid guestId, CancellationToken ct)
+	{
+		var hasActiveReservation = await reservationRepository.GuestHasActiveReservationAsync(guestId, ct);
+		return !hasActiveReservation;
+	}
+
+	public async Task<bool> GetHostDeletionEligibilityAsync(Guid hostId, CancellationToken ct)
+	{
+		var hasActiveReservation = await reservationRepository.HostHasActiveReservationAsync(hostId, ct);
+		return !hasActiveReservation;
+	}
 }

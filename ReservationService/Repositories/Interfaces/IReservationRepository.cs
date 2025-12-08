@@ -1,6 +1,5 @@
 ﻿using ReservationService.Domain.Entities;
 using ReservationService.DTO;
-using System.Threading.Tasks;
 
 namespace ReservationService.Repositories.Interfaces
 {
@@ -11,5 +10,7 @@ namespace ReservationService.Repositories.Interfaces
 		Task AcquireAccommodationLockAsync(Guid accommodationId, CancellationToken ct = default);
 		Task<bool> ExistsByIdempotencyKey(Guid guestId, Guid idempotencyKey, CancellationToken ct = default);
 		Task<IReadOnlyList<GuestApprovedReservationResponseDTO>> GetApprovedReservationsByGuestIdAsync(CancellationToken ct, Guid GuestId);
+		Task<bool> GuestHasActiveReservationAsync(Guid guestId, CancellationToken ct);
+		Task<bool> HostHasActiveReservationAsync(Guid hostId, CancellationToken ct);
 	}
 }

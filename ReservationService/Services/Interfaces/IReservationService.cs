@@ -9,5 +9,7 @@ namespace ReservationService.Services.Interfaces
 		Task<IReadOnlyList<GuestApprovedReservationResponseDTO>> GetApprovedForGuestAsync(CancellationToken ct);
 		Task ApproveAsync(Guid reservationId, CancellationToken ct);
 		Task DeclineAsync(Guid reservationId, CancellationToken ct);
+		Task<bool> GetGuestDeletionEligibilityAsync(Guid guestId, CancellationToken ct);
+		Task<bool> GetHostDeletionEligibilityAsync(Guid hostId, CancellationToken ct);
 	}
 }

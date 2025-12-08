@@ -4,6 +4,7 @@ using ReservationService.Domain.Entities;
 using ReservationService.Domain.Enums;
 using ReservationService.DTO;
 using ReservationService.Repositories.Interfaces;
+using System.Linq.Expressions;
 
 namespace ReservationService.Repositories.Implementations
 {
@@ -68,5 +69,24 @@ namespace ReservationService.Repositories.Implementations
 				})
 				.ToListAsync(ct);
 		}
+		private static DateTimeOffset NowUtc() => DateTimeOffset.UtcNow;
+
+		private Task<bool> UserHasActiveReservationAsync(
+		Expression<Func<Reservation, bool>> userPredicate,
+		CancellationToken ct)
+		{
+			var now = NowUtc();
+
+			return Context.Reservations
+				.AsNoTracking()
+				.Where(userPredicate)
+				.AnyAsync(r => r.Status == ReservationStatus.Approved && r.EndDate > now, ct);
+		}
+
+		public Task<bool> GuestHasActiveReservationAsync(Guid guestId, CancellationToken ct)
+			=> UserHasActiveReservationAsync(r => r.GuestId == guestId, ct);
+
+		public Task<bool> HostHasActiveReservationAsync(Guid hostId, CancellationToken ct)
+			=> UserHasActiveReservationAsync(r => r.HostId == hostId, ct);
 	}
 }

@@ -54,5 +54,19 @@ namespace ReservationService.Controllers
 			await reservationService.DeclineAsync(reservationId, ct);
 			return StatusCode(StatusCodes.Status202Accepted);
 		}
+
+		[HttpGet("internal/deletion-eligibility/host/{hostId:guid}")]
+		public async Task<IActionResult> HostDeletionEligibility(Guid hostId, CancellationToken ct)
+		{
+			var hostCheck = await reservationService.GetHostDeletionEligibilityAsync(hostId, ct);
+			return Ok(hostCheck);
+		}
+
+		[HttpGet("internal/deletion-eligibility/guest/{guestId:guid}")]
+		public async Task<IActionResult> GuestDeletionEligibility(Guid guestId, CancellationToken ct)
+		{
+			var guestCheck = await reservationService.GetGuestDeletionEligibilityAsync(guestId, ct);
+			return Ok(guestCheck);
+		}
 	}
 }
