@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using ReservationService.Common.Events;
 using ReservationService.Infrastructure.Clients;
 using ReservationService.Repositories.Implementations;
 using ReservationService.Repositories.Interfaces;
@@ -22,7 +23,8 @@ namespace ReservationService.Infrastructure.Extensions
 			services.AddScoped<IReservationRepository, ReservationRepository>();
 			services.AddScoped<IUnitOfWork, UnitOfWork>();
 			services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-			return services;
+            services.AddSingleton<IEventBus, RabbitMqEventBus>();
+            return services;
 		}
 		public static IServiceCollection AddSwaggerGenWithAuth(this IServiceCollection services)
 		{

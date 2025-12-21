@@ -80,7 +80,7 @@ namespace ReservationService.Repositories.Implementations
 			return Context.Reservations
 				.AsNoTracking()
 				.Where(userPredicate)
-				.AnyAsync(r => r.Status == ReservationStatus.Approved && r.EndDate > now, ct);
+				.AnyAsync(r => (r.Status == ReservationStatus.Approved || r.Status == ReservationStatus.Pending) && r.EndDate > now, ct);
 		}
 
 		public Task<bool> GuestHasActiveReservationAsync(Guid guestId, CancellationToken ct)

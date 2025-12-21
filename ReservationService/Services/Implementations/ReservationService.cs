@@ -1,4 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using ReservationService.Common.Events;
+using ReservationService.Common.Events.Published;
 using ReservationService.Common.Exceptions;
 using ReservationService.Domain.Entities;
 using ReservationService.Domain.Enums;
@@ -13,7 +15,8 @@ public class ReservationService(
     ICurrentUserService currentUserService,
     IReservationRepository reservationRepository,
     IAccommodationClient accommodationClient,
-    IUnitOfWork unitOfWork) : IReservationService
+    IUnitOfWork unitOfWork,
+    IEventBus eventBus) : IReservationService
 {
     public async Task CreateAsync(CreateReservationRequest request, Guid idempotencyKey,
         CancellationToken ct = default)
@@ -47,6 +50,17 @@ public class ReservationService(
         await RejectPendingIfApprovedAsync(status, request, ct);
 
         await transaction.CommitAsync(ct);
+
+        if (status == ReservationStatus.Approved)
+        {
+            await eventBus.PublishAsync(
+                new ReservationApprovedIntegrationEvent(
+                    reservation.AccommodationId,
+                    reservation.Id,
+                    reservation.StartDate,
+                    reservation.EndDate),
+                ct);
+        }
     }
 
     private Guid GetCurrentUserIdOrThrow()
@@ -112,7 +126,6 @@ public class ReservationService(
             accommodationId: request.AccommodationId,
             guestId: userId,
             hostId: info.HostId,
-            idempotencyKey: idempotencyKey,
             accommodationName: info.Name,
             guestEmail: currentUserService.Email ?? throw new InvalidOperationException("Email missing in token."),
             guestUsername: currentUserService.Username ??
@@ -121,7 +134,8 @@ public class ReservationService(
             endDate: request.EndDate,
             guestsCount: request.GuestsCount,
             totalPrice: info.TotalPrice,
-            status: status
+            status: status,
+            idempotencyKey: idempotencyKey
         );
     }
 
@@ -191,6 +205,7 @@ public class ReservationService(
 
         await unitOfWork.SaveChangesAsync(ct);
 
+        await eventBus.PublishAsync(new ReservationApprovedIntegrationEvent(reservation.AccommodationId, reservationId, reservation.StartDate, reservation.EndDate), ct);
         await reservationRepository.RejectOverlappingPendingAsync(
             reservation.AccommodationId,
             reservation.StartDate,
@@ -225,6 +240,7 @@ public class ReservationService(
         reservation!.Cancel();
 
         await unitOfWork.SaveChangesAsync(ct);
+        await eventBus.PublishAsync(new ReservationCanceledIntegrationEvent(reservation.AccommodationId, reservationId), ct);
     }
 
     private static void ValidateCancellationRequest(Reservation? reservation, Guid guestId)
