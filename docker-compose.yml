@@ -8,9 +8,14 @@ services:
     container_name: reservation-service
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-
       - ConnectionStrings__DefaultConnection=Server=devops-sql,1433;Database=ReservationServiceDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True
       - Services__Accommodation__BaseUrl=http://accommodation-service:8080
+
+      - RabbitMq__Host=${RABBITMQ_HOST}
+      - RabbitMq__User=${RABBITMQ_USER}
+      - RabbitMq__Pass=${RABBITMQ_PASS}
+      - RabbitMq__VirtualHost=${RABBITMQ_VHOST}
+      - RabbitMq__Exchange=${RABBITMQ_EXCHANGE}
 
     networks:
       - shared-net

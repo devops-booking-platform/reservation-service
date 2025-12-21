@@ -36,7 +36,8 @@ builder.Services
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
-
+builder.Services.Configure<RabbitMqSettings>(
+    builder.Configuration.GetSection("RabbitMQ"));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGenWithAuth();
