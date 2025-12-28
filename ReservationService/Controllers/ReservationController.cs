@@ -31,7 +31,15 @@ namespace ReservationService.Controllers
 			return Ok(approvedReservations);
         }
 
-		[Authorize(Roles = "Guest")]
+        [Authorize(Roles = "Host")]
+        [HttpGet("pending")]
+        public async Task<IActionResult> GetPending(CancellationToken ct)
+        {
+            var pendingReservations = await reservationService.GetPendingForHostAsync(ct);
+            return Ok(pendingReservations);
+        }
+
+        [Authorize(Roles = "Guest")]
 		[HttpPatch("{reservationId:guid}/cancel")]
 		public async Task<IActionResult> Cancel([FromRoute] Guid reservationId, CancellationToken ct)
 		{

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Azure.Core;
+using Microsoft.EntityFrameworkCore;
 using ReservationService.Common.Events;
 using ReservationService.Common.Events.Published;
 using ReservationService.Common.Exceptions;
@@ -47,9 +48,30 @@ public class ReservationService(
 
         await SaveChangesHandlingIdempotencyAsync(ct);
 
-        await RejectPendingIfApprovedAsync(status, request, ct);
+        var rejected = await RejectPendingIfApprovedAsync(status, request, ct);
 
         await transaction.CommitAsync(ct);
+
+        foreach (var r in rejected)
+        {
+            await eventBus.PublishAsync(
+                new ReservationRespondedIntegrationEvent(
+                    r.GuestId,
+                    r.ReservationId,
+                    r.AccommodationName,
+                    IsApproved: false),
+                ct);
+        }
+
+        await eventBus.PublishAsync(
+            new ReservationCreatedIntegrationEvent(
+                reservation.HostId,
+                reservation.Id,
+                reservation.AccommodationName,
+                reservation.StartDate,
+                reservation.EndDate,
+                reservation.GuestUsername),
+            ct);
 
         if (status == ReservationStatus.Approved)
         {
@@ -59,6 +81,14 @@ public class ReservationService(
                     reservation.Id,
                     reservation.StartDate,
                     reservation.EndDate),
+                ct);
+
+            await eventBus.PublishAsync(
+                new ReservationRespondedIntegrationEvent(
+                    reservation.GuestId,
+                    reservation.Id,
+                    reservation.AccommodationName,
+                    true),
                 ct);
         }
     }
@@ -74,7 +104,7 @@ public class ReservationService(
 
     private static void ValidateRequest(CreateReservationRequest request)
     {
-        var todayUtc = DateTime.UtcNow;
+        var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
 
         if (request.StartDate < todayUtc)
             throw new PastDateException("Cannot create reservation for past dates.");
@@ -152,21 +182,29 @@ public class ReservationService(
         }
     }
 
-    private Task RejectPendingIfApprovedAsync(ReservationStatus status, CreateReservationRequest request,
+    private async Task<List<PendingToRejectInfo>> RejectPendingIfApprovedAsync(ReservationStatus status, CreateReservationRequest request,
         CancellationToken ct)
     {
         if (status != ReservationStatus.Approved)
-            return Task.CompletedTask;
+            return new();
 
-        return reservationRepository.RejectOverlappingPendingAsync(
+        var rejected = await reservationRepository.GetOverlappingPendingForRejectionAsync(
             request.AccommodationId,
             request.StartDate,
             request.EndDate,
             ct);
+
+        await reservationRepository.RejectOverlappingPendingAsync(
+            request.AccommodationId,
+            request.StartDate,
+            request.EndDate,
+            ct);
+
+        return rejected;
     }
 
-    private async Task EnsureNoApprovedOverlapAsync(Guid accommodationId, DateTimeOffset startDate,
-        DateTimeOffset endDate, CancellationToken ct = default)
+    private async Task EnsureNoApprovedOverlapAsync(Guid accommodationId, DateOnly startDate,
+        DateOnly endDate, CancellationToken ct = default)
     {
         var hasOverlap =
             await reservationRepository.HasOverlappingApprovedReservationAsync(accommodationId, startDate, endDate,
@@ -187,6 +225,17 @@ public class ReservationService(
         return approvedReservations;
     }
 
+    public async Task<IReadOnlyList<HostPendingReservationResponseDTO>> GetPendingForHostAsync(
+        CancellationToken ct)
+    {
+        var hostId = GetCurrentUserIdOrThrow();
+
+        var pendingReservations = await reservationRepository
+            .GetPendingReservationsByHostIdAsync(ct, hostId);
+
+        return pendingReservations;
+    }
+
     public async Task ApproveAsync(Guid reservationId, CancellationToken ct)
     {
         GetCurrentUserIdOrThrow();
@@ -205,13 +254,44 @@ public class ReservationService(
 
         await unitOfWork.SaveChangesAsync(ct);
 
-        await eventBus.PublishAsync(new ReservationApprovedIntegrationEvent(reservation.AccommodationId, reservationId, reservation.StartDate, reservation.EndDate), ct);
+        var rejected = await reservationRepository.GetOverlappingPendingForRejectionAsync(
+            reservation.AccommodationId,
+            reservation.StartDate,
+            reservation.EndDate,
+            ct);
+
         await reservationRepository.RejectOverlappingPendingAsync(
             reservation.AccommodationId,
             reservation.StartDate,
             reservation.EndDate,
             ct);
-        await unitOfWork.SaveChangesAsync(ct);
+
+        foreach (var r in rejected)
+        {
+            await eventBus.PublishAsync(
+                new ReservationRespondedIntegrationEvent(
+                    r.GuestId,
+                    r.ReservationId,
+                    r.AccommodationName,
+                    IsApproved: false),
+                ct);
+        }
+
+        await eventBus.PublishAsync(
+            new ReservationApprovedIntegrationEvent(
+                reservation.AccommodationId,
+                reservationId,
+                reservation.StartDate,
+                reservation.EndDate),
+            ct);
+
+        await eventBus.PublishAsync(
+            new ReservationRespondedIntegrationEvent(
+                reservation.GuestId,
+                reservationId,
+                reservation.AccommodationName,
+                true),
+            ct);
     }
 
     public async Task DeclineAsync(Guid reservationId, CancellationToken ct)
@@ -228,6 +308,14 @@ public class ReservationService(
         reservation.Decline();
 
         await unitOfWork.SaveChangesAsync(ct);
+
+        await eventBus.PublishAsync(
+            new ReservationRespondedIntegrationEvent(
+                reservation.GuestId,
+                reservation.Id,
+                reservation.AccommodationName,
+                false),
+            ct);
     }
 
     public async Task CancelAsync(Guid reservationId, CancellationToken ct)
@@ -240,7 +328,13 @@ public class ReservationService(
         reservation!.Cancel();
 
         await unitOfWork.SaveChangesAsync(ct);
-        await eventBus.PublishAsync(new ReservationCanceledIntegrationEvent(reservation.AccommodationId, reservationId), ct);
+        await eventBus.PublishAsync(new ReservationCanceledIntegrationEvent(reservation.HostId,
+            reservationId,
+            reservation.AccommodationId,
+            reservation.AccommodationName,
+            reservation.StartDate,
+            reservation.EndDate,
+            reservation.GuestUsername), ct);
     }
 
     private static void ValidateCancellationRequest(Reservation? reservation, Guid guestId)
@@ -255,15 +349,15 @@ public class ReservationService(
             throw new UnauthorizedAccessException("You don't have access to this reservation.");
     }
 
-	public async Task<bool> GetGuestDeletionEligibilityAsync(Guid guestId, CancellationToken ct)
-	{
-		var hasActiveReservation = await reservationRepository.GuestHasActiveReservationAsync(guestId, ct);
-		return !hasActiveReservation;
-	}
+    public async Task<bool> GetGuestDeletionEligibilityAsync(Guid guestId, CancellationToken ct)
+    {
+        var hasActiveReservation = await reservationRepository.GuestHasActiveReservationAsync(guestId, ct);
+        return !hasActiveReservation;
+    }
 
-	public async Task<bool> GetHostDeletionEligibilityAsync(Guid hostId, CancellationToken ct)
-	{
-		var hasActiveReservation = await reservationRepository.HostHasActiveReservationAsync(hostId, ct);
-		return !hasActiveReservation;
-	}
+    public async Task<bool> GetHostDeletionEligibilityAsync(Guid hostId, CancellationToken ct)
+    {
+        var hasActiveReservation = await reservationRepository.HostHasActiveReservationAsync(hostId, ct);
+        return !hasActiveReservation;
+    }
 }

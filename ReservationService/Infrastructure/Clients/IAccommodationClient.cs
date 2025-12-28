@@ -4,6 +4,6 @@ namespace ReservationService.Infrastructure.Clients
 {
 	public interface IAccommodationClient
 	{
-		Task<AccommodationReservationInfoResponseDTO> GetAccommodationReservationInfoAsync(Guid id, DateTimeOffset start, DateTimeOffset end, int guests, CancellationToken ct = default);
+		Task<AccommodationReservationInfoResponseDTO> GetAccommodationReservationInfoAsync(Guid id, DateOnly start, DateOnly end, int guests, CancellationToken ct = default);
 	}
 }
