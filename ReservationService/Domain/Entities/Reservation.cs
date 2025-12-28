@@ -11,8 +11,8 @@ namespace ReservationService.Domain.Entities
         public string AccommodationName { get; private set; } = string.Empty;
         public string GuestEmail { get; private set; } = string.Empty;
         public string GuestUsername { get; private set; } = string.Empty;
-        public DateTimeOffset StartDate { get; private set; }
-        public DateTimeOffset EndDate { get; private set; }
+        public DateOnly StartDate { get; private set; }
+        public DateOnly EndDate { get; private set; }
         public int GuestsCount { get; private set; }
         public ReservationStatus Status { get; private set; }
         public DateTime CreatedAt { get; private set; }
@@ -35,8 +35,8 @@ namespace ReservationService.Domain.Entities
             if (Status != ReservationStatus.Approved)
                 throw new InvalidOperationException("Only approved reservations can be cancelled.");
             var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
-            var startUtc = DateOnly.FromDateTime(StartDate.UtcDateTime);
-            if (todayUtc >= startUtc)
+
+            if (todayUtc >= StartDate)
                 throw new InvalidOperationException(
                     "Reservation can be cancelled only until the day before start date.");
         }
@@ -48,8 +48,8 @@ namespace ReservationService.Domain.Entities
             string accommodationName,
             string guestEmail,
             string guestUsername,
-            DateTimeOffset startDate,
-            DateTimeOffset endDate,
+            DateOnly startDate,
+            DateOnly endDate,
             int guestsCount,
             decimal totalPrice,
             ReservationStatus status,
@@ -89,8 +89,8 @@ namespace ReservationService.Domain.Entities
             string accommodationName,
             string guestEmail,
             string guestUsername,
-            DateTimeOffset startDate,
-            DateTimeOffset endDate,
+            DateOnly startDate,
+            DateOnly endDate,
             int guestsCount,
             decimal totalPrice)
         {
@@ -112,7 +112,7 @@ namespace ReservationService.Domain.Entities
             if (string.IsNullOrWhiteSpace(guestUsername))
                 throw new ArgumentException("Guest username is required.", nameof(guestUsername));
 
-            if (endDate < startDate)
+            if (endDate <= startDate)
                 throw new ArgumentOutOfRangeException(nameof(endDate), "End date must be after start date.");
 
             if (guestsCount <= 0)

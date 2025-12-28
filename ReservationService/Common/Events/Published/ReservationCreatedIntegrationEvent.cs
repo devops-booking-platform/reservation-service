@@ -1,9 +1,8 @@
 ﻿namespace ReservationService.Common.Events.Published
 {
-    public record ReservationCanceledIntegrationEvent(
+    public record ReservationCreatedIntegrationEvent(
     Guid HostId,
     Guid ReservationId,
-    Guid AccommodationId,
     string AccommodationName,
     DateOnly StartDate,
     DateOnly EndDate,
