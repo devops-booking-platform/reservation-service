@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using ReservationService.Common.Events;
+using ReservationService.Domain;
 using ReservationService.Infrastructure.Clients;
 using ReservationService.Repositories.Implementations;
 using ReservationService.Repositories.Interfaces;
@@ -24,6 +25,8 @@ namespace ReservationService.Infrastructure.Extensions
 			services.AddScoped<IUnitOfWork, UnitOfWork>();
 			services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
             services.AddSingleton<IEventBus, RabbitMqEventBus>();
+            services.AddAutoMapper(cfg => cfg.AddProfile<ReservationMappingProfile>());
+
             return services;
 		}
 		public static IServiceCollection AddSwaggerGenWithAuth(this IServiceCollection services)

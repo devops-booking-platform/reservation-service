@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReservationService.Domain;
 using ReservationService.DTO;
 using ReservationService.Services.Interfaces;
 
@@ -21,6 +22,14 @@ namespace ReservationService.Controllers
 
             await reservationService.CreateAsync(reservationRequest, idempotencyKey, ct);
             return StatusCode(StatusCodes.Status201Created);
+        }
+        
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> Search([FromQuery] GetReservationRequest request, CancellationToken ct) 
+        {
+	        var reservations = await reservationService.Search(request, ct);
+	        return Ok(reservations);
         }
 
         [Authorize(Roles = "Guest")]

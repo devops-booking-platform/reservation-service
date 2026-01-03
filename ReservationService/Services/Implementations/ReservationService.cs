@@ -1,12 +1,14 @@
-﻿using Azure.Core;
+﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using ReservationService.Common.Events;
 using ReservationService.Common.Events.Published;
 using ReservationService.Common.Exceptions;
+using ReservationService.Domain;
 using ReservationService.Domain.Entities;
 using ReservationService.Domain.Enums;
 using ReservationService.DTO;
 using ReservationService.Infrastructure.Clients;
+using ReservationService.Repositories;
 using ReservationService.Repositories.Interfaces;
 using ReservationService.Services.Interfaces;
 
@@ -17,6 +19,7 @@ public class ReservationService(
     IReservationRepository reservationRepository,
     IAccommodationClient accommodationClient,
     IUnitOfWork unitOfWork,
+    IMapper mapper,
     IEventBus eventBus) : IReservationService
 {
     public async Task CreateAsync(CreateReservationRequest request, Guid idempotencyKey,
@@ -182,7 +185,8 @@ public class ReservationService(
         }
     }
 
-    private async Task<List<PendingToRejectInfo>> RejectPendingIfApprovedAsync(ReservationStatus status, CreateReservationRequest request,
+    private async Task<List<PendingToRejectInfo>> RejectPendingIfApprovedAsync(ReservationStatus status,
+        CreateReservationRequest request,
         CancellationToken ct)
     {
         if (status != ReservationStatus.Approved)
@@ -359,5 +363,25 @@ public class ReservationService(
     {
         var hasActiveReservation = await reservationRepository.HostHasActiveReservationAsync(hostId, ct);
         return !hasActiveReservation;
+    }
+
+    public async Task<PagedResult<GetReservationResponse>> Search(GetReservationRequest request,
+        CancellationToken ct = default)
+    {
+        var userId = GetCurrentUserIdOrThrow();
+        var role = currentUserService.Role;
+        if (string.IsNullOrEmpty(role))
+        {
+            throw new UnauthorizedAccessException("You don't have access to this functionality.");
+        }
+
+        return await reservationRepository
+            .Query()
+            .QueryByUser(userId, role!)
+            .QueryByStatus(request.Status)
+            .OrderBy(x => x.StartDate)
+            .ToPagedAsync<Reservation, GetReservationResponse>(request.Page,
+                request.PageSize,
+                mapper.ConfigurationProvider);
     }
 }
