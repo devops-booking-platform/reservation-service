@@ -1,4 +1,5 @@
-﻿using ReservationService.DTO;
+﻿using ReservationService.Domain;
+using ReservationService.DTO;
 
 namespace ReservationService.Services.Interfaces
 {
@@ -12,5 +13,6 @@ namespace ReservationService.Services.Interfaces
 		Task DeclineAsync(Guid reservationId, CancellationToken ct);
 		Task<bool> GetGuestDeletionEligibilityAsync(Guid guestId, CancellationToken ct);
 		Task<bool> GetHostDeletionEligibilityAsync(Guid hostId, CancellationToken ct);
+		Task<PagedResult<GetReservationResponse>> Search(GetReservationRequest request, CancellationToken ct = default);
 	}
 }
