@@ -14,6 +14,7 @@ public class GetReservationResponse
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public int GuestsCount { get; set; }
+    public int TotalPreviousCancellationsByGuest { get; set; }
     public ReservationStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public decimal TotalPrice { get; set; }
