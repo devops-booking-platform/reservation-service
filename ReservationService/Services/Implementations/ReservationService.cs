@@ -375,7 +375,7 @@ public class ReservationService(
             throw new UnauthorizedAccessException("You don't have access to this functionality.");
         }
 
-        return await reservationRepository
+        var response = await reservationRepository
             .Query()
             .QueryByUser(userId, role!)
             .QueryByStatus(request.Status)
@@ -383,5 +383,23 @@ public class ReservationService(
             .ToPagedAsync<Reservation, GetReservationResponse>(request.Page,
                 request.PageSize,
                 mapper.ConfigurationProvider);
+
+        var cancelledReservations = await reservationRepository
+            .Query()
+            .Where(x => x.Status == ReservationStatus.CancelledByGuest)
+            .GroupBy(x => x.GuestId)
+            .Select(g => new
+            {
+                GuestId = g.Key,
+                TotalCancelled = g.Count()
+            }).ToListAsync(ct);
+
+        foreach (var item in response.Items)
+        {
+            item.TotalPreviousCancellationsByGuest =
+                cancelledReservations.FirstOrDefault(x => x.GuestId == item.GuestId)?.TotalCancelled ?? 0;
+        }
+
+        return response;
     }
 }
