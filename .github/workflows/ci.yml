@@ -2,21 +2,21 @@ name: Reservation Service CI
 
 on:
   push:
-    branches:
-      - develop
-      - main
+    branches: [develop, main]
   pull_request:
-    branches:
-      - develop
-      - main
+    branches: [develop, main]
+
+permissions:
+  contents: read
+  packages: write
+
 env:
   DOTNET_VERSION: "8.0.x"
   SOLUTION_PATH: "./ReservationService.sln"
 
 jobs:
-  build:
+  build_test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,3 +34,61 @@ jobs:
 
       - name: Test
         run: dotnet test ${{ env.SOLUTION_PATH }} --configuration Release --no-restore --no-build --verbosity normal
+
+  docker_build_pr:
+    needs: build_test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Docker build (no push) - verify Dockerfile
+        run: |
+          docker build -t reservation-service:pr -f ReservationService/Dockerfile ReservationService
+
+  containerize_kaniko:
+    needs: build_test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compute image name & tags
+        id: vars
+        shell: bash
+        run: |
+          OWNER_LC="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          REPO_LC="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${OWNER_LC}/${REPO_LC}" >> $GITHUB_OUTPUT
+          echo "tag_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "tag_branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
+      - name: Kaniko build & push (GHCR)
+        shell: bash
+        run: |
+          DOCKERFILE="ReservationService/Dockerfile"
+          CONTEXT="ReservationService"
+
+          mkdir -p "${{ github.workspace }}/kaniko-docker"
+          cat > "${{ github.workspace }}/kaniko-docker/config.json" <<EOF
+          {
+            "auths": {
+              "ghcr.io": {
+                "username": "${{ github.actor }}",
+                "password": "${{ secrets.GITHUB_TOKEN }}"
+              }
+            }
+          }
+          EOF
+
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -v "${{ github.workspace }}/kaniko-docker:/kaniko/.docker" \
+            gcr.io/kaniko-project/executor:latest \
+            --context "/workspace/${CONTEXT}" \
+            --dockerfile "/workspace/${DOCKERFILE}" \
+            --destination "${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag_sha }}" \
+            --destination "${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag_branch }}" \
+            --cache=true
