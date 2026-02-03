@@ -13,6 +13,7 @@ using ReservationService.Services.Implementations;
 using ReservationService.Services.Interfaces;
 using Serilog;
 using System.Text;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, lc) => lc
@@ -27,6 +28,7 @@ var compositeTextMapPropagator = new CompositeTextMapPropagator(new TextMapPropa
 Sdk.SetDefaultTextMapPropagator(compositeTextMapPropagator);
 var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpExporter:Endpoint"];
 
+builder.Services.AddHealthChecks();
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {
@@ -106,6 +108,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseHttpMetrics();
 app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
@@ -115,7 +119,7 @@ app.UseCors("AllowOrigins");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
+app.MapMetrics();
 app.Run();
 
 // Make Program class accessible for integration tests
