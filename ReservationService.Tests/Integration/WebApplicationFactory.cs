@@ -8,6 +8,7 @@ using Moq;
 using ReservationService.Common.Events;
 using ReservationService.Data;
 using ReservationService.Infrastructure.Clients;
+using StackExchange.Redis;
 
 namespace ReservationService.Tests.Integration;
 
@@ -39,6 +40,21 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // Replace accommodation client with mock
             services.RemoveAll(typeof(IAccommodationClient));
             services.AddSingleton(AccommodationClientMock.Object);
+
+            // Remove real Redis and add mock
+            services.RemoveAll(typeof(IConnectionMultiplexer));
+            var mockRedisDb = new Mock<IDatabase>();
+            mockRedisDb.Setup(x => x.KeyExistsAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+                .ReturnsAsync(false);
+            mockRedisDb.Setup(x => x.StringSetAsync(It.IsAny<RedisKey>(), It.IsAny<RedisValue>(), It.IsAny<TimeSpan?>(), 
+                It.IsAny<bool>(), It.IsAny<When>(), It.IsAny<CommandFlags>()))
+                .ReturnsAsync(true);
+
+            var mockRedis = new Mock<IConnectionMultiplexer>();
+            mockRedis.Setup(x => x.GetDatabase(It.IsAny<int>(), It.IsAny<object>()))
+                .Returns(mockRedisDb.Object);
+            
+            services.AddSingleton<IConnectionMultiplexer>(mockRedis.Object);
 
             // Build the service provider
             var sp = services.BuildServiceProvider();

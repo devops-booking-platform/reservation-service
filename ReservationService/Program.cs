@@ -13,6 +13,9 @@ using ReservationService.Services.Implementations;
 using ReservationService.Services.Interfaces;
 using Serilog;
 using System.Text;
+using Prometheus;
+using ReservationService.Infrastructure;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, lc) => lc
@@ -27,6 +30,7 @@ var compositeTextMapPropagator = new CompositeTextMapPropagator(new TextMapPropa
 Sdk.SetDefaultTextMapPropagator(compositeTextMapPropagator);
 var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpExporter:Endpoint"];
 
+builder.Services.AddHealthChecks();
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {
@@ -44,6 +48,20 @@ builder.Services.AddOpenTelemetry()
     });
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>();
+builder.Services.Configure<RedisSettings>(builder.Configuration.GetSection("Redis"));
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var redisSettings = builder.Configuration.GetSection("Redis").Get<RedisSettings>();
+    var options = new ConfigurationOptions
+    {
+        EndPoints = { $"{redisSettings!.Host}:{redisSettings.Port}" },
+        Password = redisSettings.Password,
+        AbortOnConnectFail = false
+    };
+
+    return ConnectionMultiplexer.Connect(options);
+});
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -69,6 +87,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.Configure<RabbitMqSettings>(
     builder.Configuration.GetSection("RabbitMQ"));
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGenWithAuth();
@@ -106,6 +125,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<VisitorTrackingMiddleware>();
+app.UseHttpMetrics();
 app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
@@ -115,7 +137,7 @@ app.UseCors("AllowOrigins");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
+app.MapMetrics();
 app.Run();
 
 // Make Program class accessible for integration tests
