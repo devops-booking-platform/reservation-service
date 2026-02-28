@@ -1,0 +1,124 @@
+﻿using Microsoft.EntityFrameworkCore;
+using ReservationService.Data;
+using ReservationService.Domain.Entities;
+using ReservationService.Domain.Enums;
+using ReservationService.DTO;
+using ReservationService.Repositories.Interfaces;
+using System.Linq.Expressions;
+
+namespace ReservationService.Repositories.Implementations
+{
+	public class ReservationRepository(ApplicationDbContext context) : Repository<Reservation>(context), IReservationRepository
+	{
+		public Task<int> RejectOverlappingPendingAsync(Guid accommodationId, DateOnly startDate, DateOnly endDate, CancellationToken ct)
+		{
+			return Context.Reservations
+				.Where(r => r.AccommodationId == accommodationId
+							&& r.StartDate < endDate
+							&& r.EndDate > startDate
+							&& r.Status == ReservationStatus.Pending)
+				.ExecuteUpdateAsync(setters => setters
+					.SetProperty(r => r.Status, ReservationStatus.Rejected), ct);
+		}
+        public Task<List<PendingToRejectInfo>> GetOverlappingPendingForRejectionAsync(Guid accommodationId, DateOnly startDate, DateOnly endDate, CancellationToken ct)
+        {
+            return Context.Reservations
+                .Where(r => r.AccommodationId == accommodationId
+                            && r.StartDate < endDate
+                            && r.EndDate > startDate
+                            && r.Status == ReservationStatus.Pending)
+                .Select(r => new PendingToRejectInfo(
+                    r.GuestId,
+                    r.Id,
+                    r.AccommodationName))
+                .ToListAsync(ct);
+        }
+        public Task<bool> HasOverlappingApprovedReservationAsync(Guid accommodationId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default)
+		{
+			return Context.Reservations.AnyAsync(x =>
+			x.AccommodationId == accommodationId &&
+			x.StartDate < endDate &&
+			x.EndDate > startDate &&
+			x.Status == ReservationStatus.Approved
+			, ct);
+		}
+		public Task AcquireAccommodationLockAsync(Guid accommodationId, CancellationToken ct = default)
+		{
+			return Context.Database.ExecuteSqlInterpolatedAsync($@"
+			DECLARE @result int;
+
+			EXEC @result = sp_getapplock
+				@Resource   = {"reservation:" + accommodationId},
+				@LockMode   = 'Exclusive',
+				@LockOwner  = 'Transaction',
+				@LockTimeout = 3000;
+
+			IF (@result < 0)
+				THROW 50001, 'Could not acquire reservation lock (timeout).', 1;
+			", ct);
+		}
+
+		public Task<bool> ExistsByIdempotencyKey(Guid guestId, Guid idempotencyKey, CancellationToken ct = default)
+		{
+			return Context.Reservations.AnyAsync(x => x.IdempotencyKey == idempotencyKey && x.GuestId == guestId, ct);
+		}
+
+		public async Task<IReadOnlyList<GuestApprovedReservationResponseDTO>> GetApprovedReservationsByGuestIdAsync(
+		CancellationToken ct,
+		Guid guestId)
+		{
+			return await Context.Reservations
+				.AsNoTracking()
+				.Where(x => x.GuestId == guestId && x.Status == ReservationStatus.Approved)
+				.Select(r => new GuestApprovedReservationResponseDTO
+				{
+					Id = r.Id,
+					AccommodationName = r.AccommodationName,
+					StartDate = r.StartDate,
+					EndDate = r.EndDate,
+					TotalPrice = r.TotalPrice,
+					GuestsCount = r.GuestsCount
+				})
+				.ToListAsync(ct);
+		}
+
+        public async Task<IReadOnlyList<HostPendingReservationResponseDTO>> GetPendingReservationsByHostIdAsync(
+        CancellationToken ct,
+        Guid hostId)
+        {
+            return await Context.Reservations
+                .AsNoTracking()
+                .Where(x => x.HostId == hostId && x.Status == ReservationStatus.Pending)
+                .Select(r => new HostPendingReservationResponseDTO
+                {
+                    ReservationId = r.Id,
+                    AccommodationName = r.AccommodationName,
+                    StartDate = r.StartDate,
+                    EndDate = r.EndDate,
+                    TotalPrice = r.TotalPrice,
+                    GuestsCount = r.GuestsCount
+                })
+                .ToListAsync(ct);
+        }
+        private static DateOnly NowUtc()
+           => DateOnly.FromDateTime(DateTime.UtcNow);
+
+        private Task<bool> UserHasActiveReservationAsync(
+		Expression<Func<Reservation, bool>> userPredicate,
+		CancellationToken ct)
+		{
+			var now = NowUtc();
+
+			return Context.Reservations
+				.AsNoTracking()
+				.Where(userPredicate)
+				.AnyAsync(r => (r.Status == ReservationStatus.Approved || r.Status == ReservationStatus.Pending) && r.EndDate > now, ct);
+		}
+
+		public Task<bool> GuestHasActiveReservationAsync(Guid guestId, CancellationToken ct)
+			=> UserHasActiveReservationAsync(r => r.GuestId == guestId, ct);
+
+		public Task<bool> HostHasActiveReservationAsync(Guid hostId, CancellationToken ct)
+			=> UserHasActiveReservationAsync(r => r.HostId == hostId, ct);
+	}
+}
